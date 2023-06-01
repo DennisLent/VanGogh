@@ -103,19 +103,15 @@ class Evolution:
         best_fitness = population.fitnesses[best_fitness_idx]
         if self.noisy_evaluations or best_fitness < self.elite_fitness:
             self.elite = population.genes[best_fitness_idx, :].copy()
+            print(f"This is the elite 5:{self.elite[0:5]}")
             self.elite_fitness = best_fitness
+            print(f"And their fitness: {self.elite_fitness[0:5]}")
 
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
-
-        #Elitism
-        ratio = 0.05 #for now choose top 5% of population to survive
-        num_elites = round(self.population_size*ratio)
-        offspring.genes[-num_elites:] = self.elite.copy()
-
 
         # variation
         offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
@@ -136,6 +132,15 @@ class Evolution:
         else:
             # just replace the entire thing
             self.population = offspring
+        
+        #Elitism
+        ratio = 0.05 #for now choose top 5% of population to survive
+        num_elites = round(self.population_size*ratio)
+        if self.elite is not None:
+            offspring.genes[-num_elites:] = self.elite.copy()
+        else:
+            self.elite = self.population.genes[0].copy()
+            self.elite_fitness = self.population.fitnesses[0]
 
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
