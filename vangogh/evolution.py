@@ -107,7 +107,6 @@ class Evolution:
             self.elite = population.genes[best_fitness_idx, :].copy()
             print(f"This is the elite 5:{self.elite[0:5]}")
             self.elite_fitness = best_fitness
-            print(f"And their fitness: {self.elite_fitness[0:5]}")
 
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
@@ -136,8 +135,9 @@ class Evolution:
             self.population = offspring
         
         #Elitism
-        ratio = 0.05 #for now choose top 5% of population to survive
+        ratio = 0.2 #for now choose top 5% of population to survive
         num_elites = round(self.population_size*ratio)
+        print(f"number of elites that are kept: {num_elites}")
         if self.elite is not None:
             offspring.genes[-num_elites:] = self.elite.copy()
         else:
