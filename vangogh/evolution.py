@@ -110,6 +110,13 @@ class Evolution:
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
+
+        #Elitism
+        ratio = 0.05 #for now choose top 5% of population to survive
+        num_elites = round(self.population_size*ratio)
+        offspring.genes[-num_elites:] = self.elite.copy()
+
+
         # variation
         offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
         offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
