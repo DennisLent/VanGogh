@@ -19,3 +19,17 @@ To start a Jupyter notebook instance, have Jupyter notebook [installed](https://
 - Fitness-based Variation: Modify the mutation and crossover operators to take into account the fitness information. E.g. design mutation operators that prioritize changes in less fit individuals
 - Population initialization → deduce some statistics from the reference image, uniform initialization	
 - We should look into model-based EAs
+
+## Notes 01.06
+- implemented uniform, 2 and 3 point crossover -> uniform is the best so far (42k down to 34k) 
+- increasing population size is beneficial (100 to 300) but increases compution time
+- tried to consider fitness based on mutation (higher in the beginning and lower later)
+- could potentially implement elitism for variation
+- could try new initialization method
+- could work with adaptive mutations
+- could check into variations.py/generate_plausible_mutations
+
+### Hypothese
+- we think that uniform cross-over will improve the fitness
+- we think elitism will improve the convergence rate, but not necessarily improve the fitness
+- Changing the mutation probability, such that in the beginning its higher, will produce better fitness results.
