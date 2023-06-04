@@ -3,11 +3,18 @@ import time
 import numpy as np
 from PIL import Image
 from multiprocess import Pool, cpu_count
+import pandas as pd
 
 from vangogh import selection, variation
 from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
 from vangogh.population import Population
 from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
+from scipy.stats import multivariate_normal
+from skopt import Optimizer, BayesSearchCV
+from cma import CMAEvolutionStrategy
+from pgmpy.models import BayesianModel
+from pgmpy.estimators import MaximumLikelihoodEstimator, BayesianEstimator
+from pgmpy.sampling import BayesianModelSampling
 
 
 class Evolution:
@@ -28,7 +35,8 @@ class Evolution:
                  noisy_evaluations=False,
                  verbose=False,
                  generation_reporter=None,
-                 seed=0):
+                 seed=0,
+                 model_based=False):
 
         self.reference_image: Image = reference_image.copy()
         self.reference_image.thumbnail((int(self.reference_image.width / IMAGE_SHRINK_SCALE),
@@ -63,6 +71,7 @@ class Evolution:
         self.crossover_method = crossover_method
         self.num_evaluations = 0
         self.initialization = initialization
+        self.model_based = model_based
 
         np.random.seed(seed)
         self.seed = seed
@@ -103,7 +112,7 @@ class Evolution:
         best_fitness = population.fitnesses[best_fitness_idx]
         if self.noisy_evaluations or best_fitness < self.elite_fitness:
             self.elite = population.genes[best_fitness_idx, :].copy()
-            print(f"This is the elite 5:{self.elite[0:5]}")
+            #print(f"This is the elite 5:{self.elite[0:5]}")
             self.elite_fitness = best_fitness
 
     def __classic_generation(self, merge_parent_offspring=False):
@@ -112,14 +121,72 @@ class Evolution:
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
+        if self.model_based:
+            # selection
+            subset_size = int(self.population_size / 2)  # Adjust the subset size as needed
+            selected_indices = np.random.choice(range(self.population_size), size=subset_size, replace=False)
+            selected_solutions = offspring.genes[selected_indices]
+
+  
+            # selected_solutions = selected_solutions.reshape(-1, self.num_points, 5)  # Reshape to (n, num_points, 5)
+
+            # # Learn the structure of the Bayesian network
+            # model = BayesianModel()
+
+            # for i in range(self.num_points):
+            #     variables = ['x', 'y', 'r', 'g', 'b']
+            #     data = selected_solutions[:, i, :]  # Select data for the i-th point
+            #     df_selected = pd.DataFrame(data, columns=variables)
+
+            #     model.add_nodes_from(variables)
+            #     model.add_edges_from([(variables[j], variables[j+1]) for j in range(4)])  # Connect variables in order
+            #     model.fit(df_selected, estimator=BayesianEstimator)
+
+            # # Generate new individuals by sampling from the Bayesian network
+            # sampler = BayesianModelSampling(model)
+            # new_genes = []
+
+            # for _ in range(self.population_size):
+            #     new_individual = []
+
+            #     for i in range(self.num_points):
+            #         sample = sampler.forward_sample(size=1).values[0]
+            #         new_individual.extend(list(sample))
+
+            #     new_genes.append(new_individual)
+
+            # offspring.genes = np.array(new_genes)
+                
+            # grouped_solutions = np.split(selected_solutions, self.num_points, axis=1)
+            # groups = [np.concatenate(grouped_solutions[i::self.num_points]) for i in range(self.num_points)]
+
+            # # Estimate mean vector and covariance matrix for each group
+            # mean_vectors = [np.mean(group, axis=0) for group in groups]
+            # cov_matrices = [np.cov(group, rowvar=False) for group in groups]
+
+            # # Generate new genes based on factorized distribution
+            # new_genes = []
+            # for _ in range(self.population_size):
+            #     gene = np.concatenate([np.random.multivariate_normal(mean_vector, cov_matrix) for mean_vector, cov_matrix in zip(mean_vectors, cov_matrices)])
+            #     new_genes.append(gene)
+            # new_genes = np.array(new_genes)
+
+            # offspring.genes = new_genes
+        
+            mean_vector = np.mean(selected_solutions, axis=0)
+            covariance_matrix = np.cov(selected_solutions, rowvar=False)
+            new_genes = np.random.multivariate_normal(mean_vector, covariance_matrix, size=self.population_size)
+            offspring.genes = new_genes
+
         # variation
         offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
         offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
+
+
         # evaluate offspring
-        offspring.fitnesses = drawing_fitness_function(offspring.genes,
-                                                       self.reference_image)
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
         self.num_evaluations += len(offspring.genes)
 
         self.__update_elite(offspring)
@@ -131,16 +198,6 @@ class Evolution:
         else:
             # just replace the entire thing
             self.population = offspring
-        
-        #Elitism
-        ratio = 0.2 #for now choose top 5% of population to survive
-        num_elites = round(self.population_size*ratio)
-        print(f"number of elites that are kept: {num_elites}")
-        if self.elite is not None:
-            offspring.genes[-num_elites:] = self.elite.copy()
-        else:
-            self.elite = self.population.genes[0].copy()
-            self.elite_fitness = self.population.fitnesses[0]
 
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
