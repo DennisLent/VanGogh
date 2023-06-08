@@ -25,6 +25,7 @@ class Evolution:
                  num_features_mutation_strength_decay_generations=None,
                  selection_name='tournament_2',
                  initialization='RANDOM',
+                 mutation_method='ADD_RANMDOM',
                  noisy_evaluations=False,
                  verbose=False,
                  generation_reporter=None,
@@ -63,6 +64,7 @@ class Evolution:
         self.crossover_method = crossover_method
         self.num_evaluations = 0
         self.initialization = initialization
+        self.mutation_method = mutation_method
 
         np.random.seed(seed)
         self.seed = seed
@@ -79,7 +81,7 @@ class Evolution:
 
         # set up population and elite
         self.genotype_length = len(feature_intervals)
-        self.population = Population(self.population_size, self.genotype_length, self.initialization)
+        self.population = Population(self.population_size, self.genotype_length, self.initialization, np.array(REFERENCE_IMAGE))
         self.elite = None
         self.elite_fitness = np.inf
 
@@ -107,14 +109,14 @@ class Evolution:
 
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, np.array(REFERENCE_IMAGE))
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
         # variation
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        offspring.genes = variation.crossover(offspring.genes, self.population.fitnesses, self.crossover_method)
         offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
-                                           num_features_mutation_strength=self.num_features_mutation_strength)
+                                           num_features_mutation_strength=self.num_features_mutation_strength, method=self.mutation_method)
         # evaluate offspring
         offspring.fitnesses = drawing_fitness_function(offspring.genes,
                                                        self.reference_image)
@@ -129,7 +131,6 @@ class Evolution:
         else:
             # just replace the entire thing
             self.population = offspring
-
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
 
@@ -149,14 +150,14 @@ class Evolution:
             self.elite_fitness = best_fitness
 
         start_time_seconds = time.time()
-
+        print(self.population.genes, self.population.genes.shape)
         # run generation_budget
         i_gen = 0
         while True:
             if self.num_features_mutation_strength_decay_generations is not None:
                 if i_gen in self.num_features_mutation_strength_decay_generations:
                     self.num_features_mutation_strength *= self.num_features_mutation_strength_decay
-
+            self.update_mutation_rate()
             if self.evolution_type == 'classic':
                 self.__classic_generation(merge_parent_offspring=False)
             elif self.evolution_type == 'p+o':
@@ -195,8 +196,13 @@ class Evolution:
         draw_voronoi_image(self.elite, self.reference_image.width, self.reference_image.height,
                            scale=IMAGE_SHRINK_SCALE) \
             .save(
-            f"./img/van_gogh_final_{self.seed}_{self.population_size}_{self.crossover_method}_{self.num_points}_{self.initialization}_{self.generation_budget}.png")
+            f"./img/van_gogh_final_{self.seed}_{self.population_size}_{self.crossover_method}_{self.num_points}_{self.initialization}_{self.mutation_method}_{self.generation_budget}.png")
         return data
+    
+    def update_mutation_rate(self, threshold=0.1, increase_factor=2, max_mutation_rate=0.8):
+        std_dev = np.std(self.population.fitnesses)
+        if std_dev < threshold:
+            self.mutation_probability = min(self.mutation_probability * increase_factor, max_mutation_rate)
 
 
 if __name__ == '__main__':
@@ -207,6 +213,7 @@ if __name__ == '__main__':
                     generation_budget=300,
                     crossover_method='ONE_POINT',
                     initialization='RANDOM',
+                    mutation_method='ADD_RANDOM',
                     num_features_mutation_strength=.25,
                     num_features_mutation_strength_decay=None,
                     num_features_mutation_strength_decay_generations=None,
