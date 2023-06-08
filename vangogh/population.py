@@ -7,15 +7,23 @@ class Population:
         self.fitnesses = np.zeros(shape=(population_size,))
         self.initialization = initialization
 
-    def initialize(self, feature_intervals):
+    def initialize(self, feature_intervals, image_data):
         n = self.genes.shape[0]
         l = self.genes.shape[1]
-
         if self.initialization == "RANDOM":
             for i in range(l):
                 init_feat_i = np.random.randint(low=feature_intervals[i][0],
                                                         high=feature_intervals[i][1], size=n)
                 self.genes[:, i] = init_feat_i
+        elif self.initialization == "MATCH":
+            for i in range(l):
+                init_feat_i = np.random.randint(low=feature_intervals[i][0],
+                                                        high=feature_intervals[i][1], size=n)
+                self.genes[:, i] = init_feat_i
+            for g in range(0, len(self.genes)):
+                for i in range(0, len(self.genes[g]), 5):
+                    x, y = self.genes[g][i:i+2]
+                    self.genes[g][i+2:i+5] = image_data[y][x]
         else:
             raise Exception("Unknown initialization method")
 
