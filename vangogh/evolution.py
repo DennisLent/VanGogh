@@ -150,7 +150,7 @@ class Evolution:
     def run(self):
         data = []
 
-        self.population.initialize(self.feature_intervals)
+        self.population.initialize(self.feature_intervals, self.reference_image_array)
 
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
                                                              self.reference_image)
