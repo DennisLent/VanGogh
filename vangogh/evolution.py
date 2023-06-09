@@ -178,6 +178,8 @@ class Evolution:
                          "crossover-method": self.crossover_method,
                          "population-size": self.population_size, "num-points": self.num_points,
                          "initialization": self.initialization,
+                         "mutation-method": self.mutation_method,
+                         "selection": self.selection_name,
                          "seed": self.seed})
             if self.generation_reporter is not None:
                 self.generation_reporter(
