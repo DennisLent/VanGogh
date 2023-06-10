@@ -28,6 +28,7 @@ class Evolution:
                  noisy_evaluations=False,
                  verbose=False,
                  generation_reporter=None,
+                 elite_ratio=0,
                  seed=0):
 
         self.reference_image: Image = reference_image.copy()
@@ -63,6 +64,7 @@ class Evolution:
         self.crossover_method = crossover_method
         self.num_evaluations = 0
         self.initialization = initialization
+        self.elite_ratio = elite_ratio
 
         np.random.seed(seed)
         self.seed = seed
@@ -99,11 +101,10 @@ class Evolution:
                 "Warning: using noisy evaluations but age regularized evolution does not re-evaluate the entire population every generation")
 
     def __update_elite(self, population):
-        best_fitness_idx = np.argmin(population.fitnesses)
+        best_fitness_idx = np.argsort(population.fitnesses)
         best_fitness = population.fitnesses[best_fitness_idx]
         if self.noisy_evaluations or best_fitness < self.elite_fitness:
             self.elite = population.genes[best_fitness_idx, :].copy()
-            print(f"This is the elite 5:{self.elite[0:5]}")
             self.elite_fitness = best_fitness
 
     def __classic_generation(self, merge_parent_offspring=False):
@@ -124,6 +125,12 @@ class Evolution:
 
         self.__update_elite(offspring)
 
+        num_elite = round(self.elite_ratio * self.population_size)
+        if num_elite > 0:
+            elite_indices = np.argsort(self.population.fitnesses)[:num_elite]
+            offspring.genes[-num_elite:, :] = self.population.genes[elite_indices, :].copy()
+            offspring.genes[:-1, :] = self.population.genes[elite_indices[-1, :]].copy
+
         # selection
         if merge_parent_offspring:
             # p+o mode
@@ -132,18 +139,8 @@ class Evolution:
             # just replace the entire thing
             self.population = offspring
         
-        #Elitism
-        ratio = 0.2 #for now choose top 5% of population to survive
-        num_elites = round(self.population_size*ratio)
-        print(f"number of elites that are kept: {num_elites}")
-        if self.elite is not None:
-            offspring.genes[-num_elites:] = self.elite.copy()
-        else:
-            self.elite = self.population.genes[0].copy()
-            self.elite_fitness = self.population.fitnesses[0]
 
-        self.population = selection.select(self.population, self.population_size,
-                                           selection_name=self.selection_name)
+        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
 
     def run(self):
         data = []
@@ -189,6 +186,7 @@ class Evolution:
                          "crossover-method": self.crossover_method,
                          "population-size": self.population_size, "num-points": self.num_points,
                          "initialization": self.initialization,
+                         "elite_ratio": self.elite_ratio,
                          "seed": self.seed})
             if self.generation_reporter is not None:
                 self.generation_reporter(
