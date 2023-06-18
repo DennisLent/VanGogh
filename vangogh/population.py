@@ -7,6 +7,7 @@ class Population:
         self.genes = np.empty(shape=(population_size, genotype_length), dtype=int)
         self.fitnesses = np.zeros(shape=(population_size,))
         self.initialization = initialization
+        self.image = image
 
     def initialize(self, feature_intervals, image_data):
         n = self.genes.shape[0]

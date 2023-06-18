@@ -132,7 +132,7 @@ def gaussian_mutation(genes, feature_intervals, mutation_probability):
     genes = np.array(genes, dtype=int)
     mask_mut = np.random.choice([True, False], size=genes.shape,
                                 p=[mutation_probability, 1 - mutation_probability])
-
+    mutations = np.zeros_like(genes)
     for i in range(genes.shape[1]):
         range_num = feature_intervals[i % NUM_VARIABLES_PER_POINT][1] - feature_intervals[i % NUM_VARIABLES_PER_POINT][0]
         std_dev = range_num / 6

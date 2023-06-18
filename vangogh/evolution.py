@@ -13,7 +13,7 @@ from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_
 class Evolution:
     def __init__(self,
                  num_points,
-                 reference_image: Image,
+                 reference_image: Image = REFERENCE_IMAGE,
                  evolution_type='p+o',
                  population_size=200,
                  generation_budget=-1,
@@ -81,7 +81,7 @@ class Evolution:
 
         # set up population and elite
         self.genotype_length = len(feature_intervals)
-        self.population = Population(self.population_size, self.genotype_length, self.initialization, np.array(REFERENCE_IMAGE))
+        self.population = Population(self.population_size, self.genotype_length, self.initialization, REFERENCE_IMAGE)
         self.elite = None
         self.elite_fitness = np.inf
 
