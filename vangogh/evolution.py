@@ -14,7 +14,7 @@ class Evolution:
     def __init__(self,
                  num_points,
                  reference_image: Image,
-                 evolution_type='p+o',
+                 evolution_type='classic',
                  population_size=200,
                  generation_budget=-1,
                  evaluation_budget=-1,
@@ -28,7 +28,6 @@ class Evolution:
                  noisy_evaluations=False,
                  verbose=False,
                  generation_reporter=None,
-                 elite_ratio=0,
                  seed=0):
 
         self.reference_image: Image = reference_image.copy()
@@ -64,7 +63,6 @@ class Evolution:
         self.crossover_method = crossover_method
         self.num_evaluations = 0
         self.initialization = initialization
-        self.elite_ratio = elite_ratio
 
         np.random.seed(seed)
         self.seed = seed
@@ -107,12 +105,12 @@ class Evolution:
             self.elite = population.genes[best_fitness_idx, :].copy()
             self.elite_fitness = best_fitness
 
+
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
-
         # variation
         offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
         offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
@@ -122,7 +120,7 @@ class Evolution:
         offspring.fitnesses = drawing_fitness_function(offspring.genes,
                                                        self.reference_image)
         self.num_evaluations += len(offspring.genes)
-
+        
         self.__update_elite(offspring)
 
         num_elite = round(self.elite_ratio * self.population_size)
@@ -136,11 +134,23 @@ class Evolution:
             # p+o mode
             self.population.stack(offspring)
         else:
-            # just replace the entire thing
-            self.population = offspring
-        
+            # just replace the entire thing & use elitism
+            num_elites = round(self.ratio_elite*self.population_size)
+            if num_elites > 0:
+                print(f"{num_elites} elites")
+                #print(f"pop: fitness = {self.population.fitnesses}")
+                elite_index = np.argsort(self.population.fitnesses)[:num_elites]
+                #print(f"index of elites = {elite_index} with {self.population.fitnesses[elite_index]}")
 
-        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+                #replace worst offspring with old elites
+                worst_offspring_index = np.argsort(offspring.fitnesses)[::-1][:num_elites]
+                #print(f"index of worst off = {worst_offspring_index} with {offspring.fitnesses[worst_offspring_index]}")
+                offspring.genes[worst_offspring_index] = self.population.genes[elite_index].copy()
+            
+            self.population = offspring
+
+        self.population = selection.select(self.population, self.population_size,
+                                           selection_name=self.selection_name)
 
     def run(self):
         data = []
@@ -151,11 +161,13 @@ class Evolution:
                                                              self.reference_image)
         self.num_evaluations = len(self.population.genes)
 
-        best_fitness_idx = np.argmin(self.population.fitnesses)
-        best_fitness = self.population.fitnesses[best_fitness_idx]
-        if best_fitness > self.elite_fitness:
-            self.elite = self.population.genes[best_fitness_idx, :].copy()
-            self.elite_fitness = best_fitness
+        self.__update_elite(self.population)
+
+        # best_fitness_idx = np.argmin(self.population.fitnesses)
+        # best_fitness = self.population.fitnesses[best_fitness_idx]
+        # if best_fitness > self.elite_fitness:
+        #     self.elite = self.population.genes[best_fitness_idx, :].copy()
+        #     self.elite_fitness = best_fitness
 
         start_time_seconds = time.time()
 
@@ -186,7 +198,6 @@ class Evolution:
                          "crossover-method": self.crossover_method,
                          "population-size": self.population_size, "num-points": self.num_points,
                          "initialization": self.initialization,
-                         "elite_ratio": self.elite_ratio,
                          "seed": self.seed})
             if self.generation_reporter is not None:
                 self.generation_reporter(
